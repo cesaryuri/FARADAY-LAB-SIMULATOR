@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Faraday Lab Pro</title>
+  <title>Faraday Lab Pro - Completo</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -38,15 +38,24 @@
       height: 18px;
       width: 18px;
       border-radius: 50%;
-      background: #2563eb;
+      background: #3b82f6; /* Blue thumb standard */
       cursor: pointer;
       margin-top: -7px;
-      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
       transition: all 0.2s;
     }
+    /* Specific slider for the Faraday bar (Amber) */
+    .slider-amber::-webkit-slider-thumb {
+        background: #f59e0b;
+        box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2);
+    }
+    .slider-amber::-webkit-slider-thumb:hover {
+        box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.3);
+    }
+
     input[type=range]::-webkit-slider-thumb:hover {
       transform: scale(1.1);
-      box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.3);
+      box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.3);
     }
     input[type=range]::-webkit-slider-runnable-track {
       width: 100%;
@@ -62,6 +71,24 @@
         linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
         linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
     }
+
+    /* Dot pattern for Faraday Sim (Matches image) */
+    .bg-dots {
+        background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+        background-size: 20px 20px;
+    }
+    
+    /* Padrão de listras para a bobina do anel */
+    .coil-pattern {
+      background-color: #7c2d12;
+      background-image: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(255, 255, 255, 0.1) 10px,
+        rgba(255, 255, 255, 0.1) 20px
+      );
+    }
   </style>
 </head>
 <body class="h-full bg-slate-50 text-slate-800">
@@ -72,7 +99,8 @@
 
 const { useState, useEffect, useRef } = React;
 
-// Componente Card
+// --- COMPONENTES UI BÁSICOS ---
+
 const Card = ({ title, subtitle, icon, children, className="" }) => (
   <div className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col ${className}`}>
     <div className="bg-slate-50/50 border-b border-slate-100 p-4 flex items-center justify-between">
@@ -90,21 +118,17 @@ const Card = ({ title, subtitle, icon, children, className="" }) => (
   </div>
 );
 
-// Componente Bloco de Fórmula
 const FormulaBlock = ({ title, formula, description, quote }) => (
-  <div className="bg-slate-800 text-slate-200 p-6 rounded-xl text-sm border border-slate-700 shadow-md">
+  <div className="bg-slate-900 text-slate-200 p-6 rounded-xl text-sm border border-slate-800 shadow-md">
     <h4 className="font-bold text-white mb-4 flex items-center gap-2 border-b border-slate-700 pb-2">
-      <i data-lucide="book-open" className="w-4 h-4 text-blue-400"></i> {title}
+      <i data-lucide="book-open" className="w-4 h-4 text-amber-400"></i> {title}
     </h4>
-    
     {description && <p className="mb-4 text-slate-300 leading-relaxed">{description}</p>}
-    
-    <div className="flex justify-center items-center bg-slate-900/80 py-4 px-4 rounded-lg border border-slate-700 shadow-inner mb-4">
+    <div className="flex justify-center items-center bg-black/30 py-4 px-4 rounded-lg border border-slate-700/50 shadow-inner mb-4">
         <span className="text-2xl font-serif text-yellow-400 font-bold tracking-wider">
           {formula}
         </span>
     </div>
-    
     {quote && (
       <p className="text-xs text-slate-400 leading-relaxed italic border-l-2 border-slate-600 pl-3">
           {quote}
@@ -113,7 +137,6 @@ const FormulaBlock = ({ title, formula, description, quote }) => (
   </div>
 );
 
-// Componente Osciloscópio
 const Oscilloscope = ({ dataLines, height = 200, timeScale = 1, yRange = 100 }) => {
   const canvasRef = useRef(null);
 
@@ -168,7 +191,6 @@ const Oscilloscope = ({ dataLines, height = 200, timeScale = 1, yRange = 100 }) 
   );
 };
 
-// Componente Gráfico Canvas Genérico
 const GraphCanvas = ({ drawFn, width=400, height=200, className="" }) => {
   const ref = useRef(null);
   useEffect(() => {
@@ -194,7 +216,482 @@ const GraphCanvas = ({ drawFn, width=400, height=200, className="" }) => {
   return <canvas ref={ref} style={{width, height}} className={`rounded border border-slate-700 ${className}`}/>;
 };
 
-// --- SIMULADORES ---
+// --- SIMULADORES ATUALIZADOS ---
+
+const BetatronSim = () => {
+  const [bFieldRate, setBFieldRate] = useState(1);
+  const [electrons, setElectrons] = useState([]);
+  const canvasRef = useRef(null);
+  const timeRef = useRef(0);
+
+  useEffect(() => {
+    const count = 30;
+    const initialElectrons = Array.from({ length: count }).map((_, i) => ({
+      angle: (i * Math.PI * 2) / count,
+      speed: 0.5,
+      radiusBase: 120 + (Math.random() - 0.5) * 20,
+      radius: 120,
+      trail: []
+    }));
+    setElectrons(initialElectrons);
+  }, []);
+
+  useEffect(() => {
+    let anim;
+    const loop = () => {
+      timeRef.current += 0.05 * bFieldRate;
+      
+      const currentB = Math.sin(timeRef.current * 0.5);
+      const inducedE = -Math.cos(timeRef.current * 0.5) * bFieldRate; 
+
+      setElectrons(prev => prev.map(e => {
+        let newSpeed = e.speed + (inducedE * 0.08); 
+        newSpeed *= 0.99; 
+        
+        let newAngle = e.angle + newSpeed * 0.1;
+        let newRadius = e.radiusBase + Math.sin(timeRef.current * 2 + e.angle) * 5;
+
+        const newTrail = [...e.trail, { x: 0, y: 0, opacity: 1 }];
+        if (newTrail.length > 10) newTrail.shift();
+
+        return {
+          ...e,
+          angle: newAngle,
+          speed: newSpeed,
+          radius: newRadius,
+          trail: newTrail.map((t, i) => ({...t, opacity: i/10}))
+        };
+      }));
+
+      const cvs = canvasRef.current;
+      if (cvs) {
+        if (cvs.width !== cvs.clientWidth * 2) {
+            cvs.width = cvs.clientWidth * 2;
+            cvs.height = cvs.clientHeight * 2;
+        }
+        
+        const ctx = cvs.getContext('2d');
+        const w = cvs.width;
+        const h = cvs.height;
+        const cx = w/2;
+        const cy = h/2;
+        const scale = 1.5;
+
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, w, h);
+        
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        const gridSize = 40;
+        for(let i=0; i<w; i+=gridSize) { ctx.moveTo(i,0); ctx.lineTo(i,h); }
+        for(let i=0; i<h; i+=gridSize) { ctx.moveTo(0,i); ctx.lineTo(w,i); }
+        ctx.stroke();
+        
+        const bIntensity = Math.abs(currentB);
+        const bColorBase = currentB > 0 ? '59, 130, 246' : '239, 68, 68'; 
+        
+        const bGradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, 100 * scale);
+        bGradient.addColorStop(0, `rgba(${bColorBase}, ${bIntensity * 0.8})`);
+        bGradient.addColorStop(0.4, `rgba(${bColorBase}, ${bIntensity * 0.3})`);
+        bGradient.addColorStop(1, 'rgba(0,0,0,0)');
+        
+        ctx.fillStyle = bGradient;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 100 * scale, 0, Math.PI*2);
+        ctx.fill();
+
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 32px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.globalAlpha = Math.max(0.3, bIntensity);
+        ctx.fillText(currentB > 0 ? "⊙ B" : "⊗ B", cx, cy);
+        ctx.globalAlpha = 1;
+
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 2;
+        
+        ctx.beginPath(); 
+        ctx.arc(cx, cy, 160 * scale, 0, Math.PI*2); 
+        ctx.stroke();
+        
+        ctx.beginPath(); 
+        ctx.arc(cx, cy, 90 * scale, 0, Math.PI*2); 
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(30, 41, 59, 0.3)';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 160 * scale, 0, Math.PI*2);
+        ctx.arc(cx, cy, 90 * scale, 0, Math.PI*2, true);
+        ctx.fill();
+
+        const eAlpha = Math.min(Math.abs(inducedE) * 0.8, 1);
+        if (eAlpha > 0.1) {
+             ctx.strokeStyle = `rgba(251, 191, 36, ${eAlpha})`; 
+             ctx.lineWidth = 4;
+             ctx.setLineDash([10, 15]);
+             ctx.beginPath();
+             ctx.arc(cx, cy, 125 * scale, 0, Math.PI*2);
+             ctx.stroke();
+             ctx.setLineDash([]);
+        }
+
+        electrons.forEach(e => {
+          const x = cx + Math.cos(e.angle) * (e.radius * scale);
+          const y = cy + Math.sin(e.angle) * (e.radius * scale);
+          
+          for(let j=1; j<=8; j++) {
+             const trailAngle = e.angle - (e.speed * 0.1 * j);
+             const tx = cx + Math.cos(trailAngle) * (e.radius * scale);
+             const ty = cy + Math.sin(trailAngle) * (e.radius * scale);
+             
+             ctx.fillStyle = `rgba(74, 222, 128, ${0.4 - (j * 0.05)})`;
+             ctx.beginPath();
+             ctx.arc(tx, ty, 2 + (3 - j*0.3), 0, Math.PI*2);
+             ctx.fill();
+          }
+
+          const pGrad = ctx.createRadialGradient(x, y, 0, x, y, 10);
+          pGrad.addColorStop(0, '#fff');
+          pGrad.addColorStop(0.3, '#4ade80');
+          pGrad.addColorStop(1, 'rgba(74, 222, 128, 0)');
+          
+          ctx.fillStyle = pGrad;
+          ctx.beginPath(); 
+          ctx.arc(x, y, 8, 0, Math.PI*2); 
+          ctx.fill();
+        });
+        
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`dB/dt (Variação): ${inducedE.toFixed(2)}`, 20, h - 20);
+        ctx.fillText(`Eletrodinâmica: ${electrons.length} partículas`, 20, h - 40);
+      }
+      anim = requestAnimationFrame(loop);
+    };
+    anim = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(anim);
+  }, [bFieldRate, electrons]); 
+
+  return (
+    <div className="grid md:grid-cols-2 gap-6">
+      <Card title="Simulador: Betatron" subtitle="Acelerador Cíclico de Partículas" icon="circle-dot" className="md:col-span-2 lg:col-span-1">
+         <div className="flex justify-center bg-slate-900 rounded-xl overflow-hidden shadow-2xl border border-slate-700 relative">
+            <div className="absolute top-3 left-3 text-xs text-blue-400 font-mono border border-blue-900/50 px-2 py-1 rounded bg-blue-900/20 backdrop-blur-sm z-10">
+              HIGH VACUUM CHAMBER
+            </div>
+            <canvas ref={canvasRef} style={{width: '100%', height: '450px'}} />
+         </div>
+         <div className="mt-6 space-y-4">
+            <div>
+              <label className="flex justify-between text-sm font-bold text-slate-600 mb-2">
+                Taxa de Variação do Campo Magnético (dB/dt)
+                <span className="text-blue-600 font-mono text-lg">{bFieldRate.toFixed(1)}</span>
+              </label>
+              <input type="range" min="0" max="5" step="0.1" value={bFieldRate} onChange={e => setBFieldRate(parseFloat(e.target.value))} className="w-full accent-blue-600 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"/>
+              <div className="flex justify-between text-xs text-slate-400 mt-1">
+                 <span>Estático</span>
+                 <span>Variação Extrema</span>
+              </div>
+            </div>
+         </div>
+      </Card>
+      
+      <div className="flex flex-col gap-6 justify-center">
+        <FormulaBlock 
+          title="Lei de Faraday-Lenz"
+          description="A variação do fluxo magnético no tempo induz um campo elétrico rotacional (E) que acelera as cargas ao longo da trajetória circular."
+          formula="∮ E · dl = - dΦ/dt"
+          quote='"O campo magnético variável age como um transformador, onde o feixe de elétrons é o enrolamento secundário." (Griffiths)'
+        />
+        
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-6 rounded-xl text-sm text-blue-900 shadow-sm">
+           <h4 className="font-bold mb-2 flex items-center gap-2 text-blue-700"><i data-lucide="info" className="w-4 h-4"></i> Guia Visual:</h4>
+           <ul className="space-y-2 list-disc list-inside opacity-90">
+             <li><strong>Centro Pulsante:</strong> Representa o campo magnético B variando no tempo.</li>
+             <li><strong>Anel Amarelo:</strong> Indica a direção e intensidade do Campo Elétrico Induzido (E).</li>
+             <li><strong>Partículas Verdes:</strong> Elétrons sendo acelerados tangencialmente.</li>
+             <li><strong>Rastro:</strong> Visualização da velocidade angular crescente.</li>
+           </ul>
+        </div>
+
+        <div className="p-4 bg-slate-800 rounded-lg border border-slate-700 text-slate-300 text-xs">
+            <div className="flex justify-between items-center mb-1">
+               <span>Raio da Órbita:</span>
+               <span className="font-mono text-white">Constante (Design Betatron)</span>
+            </div>
+            <div className="w-full bg-slate-700 h-1 rounded overflow-hidden">
+               <div className="bg-blue-500 h-full w-3/4"></div>
+            </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 2. ANEL SALTADOR (MANTIDO O SIMPLES/FLAT QUE VOCÊ GOSTOU)
+const JumpingRingSim = () => {
+  const [isOn, setIsOn] = useState(false);
+  const [ringHeight, setRingHeight] = useState(0);
+  const [velocity, setVelocity] = useState(0);
+  const [hasIronCore, setHasIronCore] = useState(true);
+
+  useEffect(() => {
+    let anim;
+    const loop = () => {
+      const gravity = 0.5;
+      const magneticPower = hasIronCore ? 20 : 3; 
+      const noise = isOn ? (Math.random() - 0.5) * 0.5 : 0;
+      const magForce = isOn ? Math.max(0, (magneticPower * 100) / (ringHeight + 20)) + noise : 0;
+      
+      let newVel = velocity + (magForce - gravity) * 0.1;
+      newVel *= 0.95; 
+      let newH = ringHeight + newVel;
+
+      if (newH < 0) { newH = 0; newVel = -newVel * 0.3; } 
+      if (newH > 240) { newH = 240; newVel = 0; } 
+
+      setRingHeight(newH);
+      setVelocity(newVel);
+      anim = requestAnimationFrame(loop);
+    };
+    anim = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(anim);
+  }, [isOn, ringHeight, velocity, hasIronCore]);
+
+  return (
+    <div className="grid md:grid-cols-2 gap-8">
+       <Card title="Simulador: Anel Saltador" subtitle="Lei de Lenz e Repulsão" icon="arrow-up-circle">
+          {/* Fundo Claro Limpo, similar à imagem enviada */}
+          <div className="relative h-96 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-end items-center overflow-hidden shadow-inner isolate p-4">
+             
+             {/* Padrão de Fundo Sutil */}
+             <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px] opacity-30 -z-10"></div>
+
+             {/* Haste Central (Núcleo) */}
+             <div 
+               className={`w-4 bg-gradient-to-r from-slate-400 to-slate-300 rounded-t-full transition-all duration-500 relative z-10`}
+               style={{ height: hasIronCore ? '280px' : '0px', opacity: hasIronCore ? 1 : 0 }}
+             ></div>
+             
+             {/* Haste Fina para o anel deslizar quando sem núcleo */}
+             {!hasIronCore && <div className="absolute bottom-24 w-1 h-64 bg-slate-300 z-0"></div>}
+
+             {/* O Anel */}
+             <div 
+               className={`absolute w-32 h-8 rounded-full border-4 border-slate-400 z-20 flex items-center justify-center transition-transform duration-75`}
+               style={{ 
+                 bottom: `${100 + ringHeight}px`,
+                 background: 'linear-gradient(90deg, #e2e8f0, #f8fafc, #e2e8f0)',
+                 boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+               }}
+             >
+                {/* Buraco do anel */}
+                <div className="w-24 h-4 bg-slate-800/10 rounded-full"></div>
+
+                {/* Brilho de corrente induzida */}
+                {isOn && ringHeight < 150 && (
+                   <div className="absolute inset-0 rounded-full border-2 border-red-400/50 animate-pulse shadow-[0_0_15px_rgba(248,113,113,0.5)]"></div>
+                )}
+             </div>
+
+             {/* Base / Bobina (Estilo Bloco Listrado da Imagem) */}
+             <div className="relative w-48 h-24 coil-pattern rounded-lg shadow-xl z-30 flex items-center justify-center border border-amber-900/20">
+                <div className="bg-black/80 text-white text-[10px] font-bold px-3 py-1 rounded tracking-widest uppercase">
+                   {hasIronCore ? "NÚCLEO FE" : "NÚCLEO AR"}
+                </div>
+             </div>
+             
+             {/* Base preta inferior */}
+             <div className="w-56 h-4 bg-slate-800 rounded mt-[-2px] z-30"></div>
+
+          </div>
+
+          <div className="mt-6 flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-200">
+             <div className="flex items-center gap-3">
+                <label className="text-sm font-bold text-slate-700">Inserir Núcleo:</label>
+                <button onClick={() => setHasIronCore(!hasIronCore)} className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${hasIronCore ? 'bg-slate-700' : 'bg-slate-300'}`}>
+                   <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform duration-300 ${hasIronCore ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                </button>
+             </div>
+             <button
+               onMouseDown={() => setIsOn(true)}
+               onMouseUp={() => setIsOn(false)}
+               onMouseLeave={() => setIsOn(false)}
+               className={`px-8 py-3 rounded-lg font-bold shadow-lg transition-all active:scale-95 flex items-center gap-2 border-b-4 
+               ${isOn 
+                  ? 'bg-red-500 text-white border-red-700 shadow-red-200' 
+                  : 'bg-red-500 text-white border-red-700 hover:bg-red-600'}`}
+             >
+               <i data-lucide="power" className={isOn ? "animate-pulse" : ""}></i> {isOn ? "ENERGIZADO" : "LIGAR (SEGURE)"}
+             </button>
+          </div>
+       </Card>
+
+       <div className="flex flex-col gap-6">
+          <FormulaBlock 
+            title="Força de Repulsão"
+            formula="F ∝ - ∇(M · B)"
+            description="A variação rápida do fluxo ao ligar induz uma corrente oposta no anel (Lei de Lenz), criando um campo magnético que se opõe ao do solenoide."
+            quote='"A corrente na espira é oposta à corrente no solenoide. E como correntes opostas se repelem, o anel salta."'
+          />
+          
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+             <h3 className="text-sm font-bold text-slate-500 mb-2 uppercase flex items-center gap-2">
+                <i data-lucide="eye" className="w-4 h-4"></i> Detalhes Visuais
+             </h3>
+             <ul className="text-sm text-slate-600 space-y-2 list-disc list-inside">
+                <li>O núcleo de ferro (mais escuro e central) concentra as linhas de campo, aumentando a força.</li>
+                <li>Sem o núcleo, o campo dispersa e a força é insuficiente para o salto.</li>
+                <li>O brilho vermelho indica o aquecimento por efeito Joule devido à alta corrente induzida.</li>
+             </ul>
+          </div>
+       </div>
+    </div>
+  );
+};
+
+// 3. BARRA MÓVEL (VISUAL DARK - REPLICANDO A IMAGEM)
+const FaradayFluxSim = () => {
+  const [barPos, setBarPos] = useState(20); 
+  const [lastPos, setLastPos] = useState(20);
+  const [velocity, setVelocity] = useState(0);
+  const [history, setHistory] = useState(new Array(100).fill(0));
+  const timeRef = useRef(Date.now());
+  const rafRef = useRef();
+
+  useEffect(() => {
+    const loop = () => {
+      const now = Date.now();
+      const dt = (now - timeRef.current) / 1000;
+      
+      if (dt > 0.05) { 
+        const v = (barPos - lastPos) / dt;
+        setVelocity(v);
+        setLastPos(barPos);
+        timeRef.current = now;
+
+        setHistory(prev => {
+          const next = [...prev, v * -1]; 
+          if (next.length > 100) next.shift();
+          return next;
+        });
+      }
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [barPos, lastPos]);
+
+  const flux = barPos * 1.5; 
+  const emf = velocity * -0.5;
+
+  const polylinePoints = history.map((val, i) => {
+      const x = i * (100 / history.length);
+      const y = 50 - (val * 2);
+      return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <div className="grid lg:grid-cols-2 gap-6 h-full">
+      <div className="flex flex-col gap-6">
+        <Card title="Simulador: Barra Móvel" subtitle="Gerando Eletricidade com Movimento" icon="maximize">
+          <div className="relative h-72 bg-slate-900 rounded-xl border border-slate-700 flex items-center justify-center p-8 overflow-hidden shadow-inner isolate">
+            
+            {/* Padrão de Pontos (Fundo Dark) */}
+            <div className="absolute inset-0 bg-dots opacity-40 pointer-events-none"></div>
+
+            {/* Container do Trilho */}
+            <div className="relative w-full h-32 flex items-center">
+              
+              {/* Trilhos (Linhas Finas) */}
+              <div className="absolute top-0 w-full h-[1px] bg-slate-600"></div>
+              <div className="absolute bottom-0 w-full h-[1px] bg-slate-600"></div>
+
+              {/* Área do Fluxo (Preenchimento Azul) */}
+              <div 
+                className="absolute left-0 top-[1px] bottom-[1px] bg-blue-600/20 border-r border-blue-500/50 transition-all duration-75 z-0 flex items-center justify-center overflow-hidden"
+                style={{ width: `${barPos}%` }}
+              >
+                 <div className="text-center">
+                    <span className="text-blue-100 font-bold text-lg opacity-90 block">Fluxo Φ</span>
+                    <span className="text-blue-300 text-[10px] font-mono block">Φ = B · A</span>
+                 </div>
+              </div>
+
+              {/* A Barra Móvel (Amarela/Dourada Brilhante) */}
+              <div 
+                className="absolute w-6 h-40 bg-amber-500 rounded-md cursor-grab active:cursor-grabbing shadow-[0_0_15px_rgba(245,158,11,0.5)] flex flex-col items-center justify-center z-20 hover:scale-105 transition-transform border border-amber-300"
+                style={{ left: `calc(${barPos}% - 12px)` }}
+              >
+                 {/* Detalhe interno da barra */}
+                 <div className="w-1 h-32 bg-amber-200/50 rounded-full"></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <label className="flex justify-between text-sm font-bold text-slate-600 mb-2">
+               Posição da Barra (Área da Espira)
+               <span className="text-blue-600 font-mono">{barPos.toFixed(0)} cm</span>
+            </label>
+            <input 
+              type="range" min="0" max="100" 
+              value={barPos} onChange={e => setBarPos(parseFloat(e.target.value))}
+              className="w-full slider-amber"
+            />
+          </div>
+        </Card>
+      </div>
+
+      <div className="flex flex-col gap-6">
+        <FormulaBlock 
+          title="Lei de Faraday"
+          description="A fem é gerada pela variação do fluxo magnético."
+          formula="ε = -dΦ/dt = -BLv"
+          quote="A regra do fluxo diz que a fem é igual à taxa negativa de variação do fluxo magnético."
+        />
+
+        <Card title="Monitoramento" icon="activity">
+          <div className="grid grid-cols-1 gap-4 mb-4">
+             <div className="bg-slate-50 p-4 rounded border border-slate-200 flex justify-between items-center">
+                <span className="text-xs font-bold uppercase text-slate-500">Fluxo (Φ)</span>
+                <span className="text-2xl font-mono font-bold text-blue-600">{flux.toFixed(1)} Wb</span>
+             </div>
+             <div className="bg-slate-50 p-4 rounded border border-slate-200 flex justify-between items-center">
+                <span className="text-xs font-bold uppercase text-slate-500">Fem (ε)</span>
+                <span className={`text-2xl font-mono font-bold transition-colors ${Math.abs(emf) > 1 ? 'text-amber-500' : 'text-slate-400'}`}>
+                  {Math.abs(emf).toFixed(1)} V
+                </span>
+             </div>
+          </div>
+
+          <div className="h-40 bg-slate-900 rounded border border-slate-700 relative overflow-hidden">
+             <div className="absolute top-2 left-2 text-xs text-slate-500 font-mono">Gráfico: Fem vs Tempo</div>
+             <div className="absolute inset-0 flex items-center">
+               <div className="w-full border-t border-slate-700 border-dashed"></div>
+             </div>
+             <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
+               <polyline 
+                 points={polylinePoints}
+                 fill="none"
+                 stroke="#f59e0b"
+                 strokeWidth="2"
+                 vectorEffect="non-scaling-stroke"
+               />
+             </svg>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+
+// --- SIMULADORES ORIGINAIS (PRESERVADOS) ---
 
 const LenzSimulator = () => {
   const [magnetX, setMagnetX] = useState(50); 
@@ -226,7 +723,7 @@ const LenzSimulator = () => {
   const coilLoops = [0, 1, 2, 3, 4, 5];
   const coilSpacing = 45; 
   const coilStartX = 187; 
-  const coilYTop = 68;     
+  const coilYTop = 68;      
   const coilYBottom = 188; 
 
   return (
@@ -352,136 +849,6 @@ const LenzSimulator = () => {
   );
 };
 
-const FaradayFluxSim = () => {
-  const [barPos, setBarPos] = useState(20); 
-  const [lastPos, setLastPos] = useState(20);
-  const [velocity, setVelocity] = useState(0);
-  const [history, setHistory] = useState(new Array(100).fill(0));
-  const timeRef = useRef(Date.now());
-  const rafRef = useRef();
-
-  useEffect(() => {
-    const loop = () => {
-      const now = Date.now();
-      const dt = (now - timeRef.current) / 1000;
-      
-      if (dt > 0.05) { 
-        const v = (barPos - lastPos) / dt;
-        setVelocity(v);
-        setLastPos(barPos);
-        timeRef.current = now;
-
-        setHistory(prev => {
-          const next = [...prev, v * -1]; 
-          if (next.length > 100) next.shift();
-          return next;
-        });
-      }
-      rafRef.current = requestAnimationFrame(loop);
-    };
-    rafRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [barPos, lastPos]);
-
-  const flux = barPos * 1.5; 
-  const emf = velocity * -0.5;
-
-  const polylinePoints = history.map((val, i) => {
-      const x = i * (100 / history.length);
-      const y = 50 - (val * 2);
-      return `${x},${y}`;
-  }).join(' ');
-
-  return (
-    <div className="grid lg:grid-cols-2 gap-6 h-full">
-      <div className="flex flex-col gap-6">
-        <Card title="Simulador: Barra Móvel" subtitle="Gerando Eletricidade com Movimento" icon="maximize">
-          <div className="relative h-64 bg-slate-900 rounded-xl border border-slate-700 flex items-center justify-center p-8 overflow-hidden">
-            <div className="absolute inset-0 opacity-30 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:20px_20px]"></div>
-            
-            <div className="relative w-full h-32 border-4 border-slate-400 border-r-0 rounded-l-md flex items-center bg-slate-800/50">
-              
-              <div 
-                className="absolute left-0 h-full bg-blue-500/20 border-r border-blue-500/50 transition-all duration-75"
-                style={{ width: `${barPos}%` }}
-              >
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                   <span className="text-blue-300 font-bold text-lg opacity-80">Fluxo Φ</span>
-                   <span className="text-blue-200 text-xs opacity-50 font-mono">Φ = B·A</span>
-                </div>
-              </div>
-
-              <div 
-                className="absolute w-6 h-40 bg-gradient-to-b from-amber-600 to-amber-400 rounded cursor-grab active:cursor-grabbing shadow-xl flex flex-col items-center justify-center z-10 hover:scale-105 transition-transform border border-amber-300"
-                style={{ left: `calc(${barPos}% - 12px)` }}
-              >
-                 <div className="w-1 h-32 bg-amber-200/50 rounded-full"></div>
-                 {Math.abs(velocity) > 5 && (
-                    <div className="absolute top-1/2 -translate-y-1/2 -right-8 text-red-400 font-bold text-xs whitespace-nowrap animate-pulse">
-                       ← Força Magnética
-                    </div>
-                 )}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6">
-            <label className="flex justify-between text-sm font-bold text-slate-600 mb-2">
-               Posição da Barra (Área da Espira)
-               <span className="text-blue-600 font-mono">{barPos.toFixed(0)} cm</span>
-            </label>
-            <input 
-              type="range" min="0" max="100" 
-              value={barPos} onChange={e => setBarPos(parseFloat(e.target.value))}
-              className="w-full accent-amber-500"
-            />
-          </div>
-        </Card>
-      </div>
-
-      <div className="flex flex-col gap-6">
-        <FormulaBlock 
-          title="Lei de Faraday"
-          description="A fem é gerada pela variação do fluxo magnético."
-          formula="ε = -dΦ/dt = -BLv"
-          quote="A regra do fluxo diz que a fem é igual à taxa negativa de variação do fluxo magnético."
-        />
-
-        <Card title="Monitoramento" icon="activity">
-          <div className="grid grid-cols-1 gap-4 mb-4">
-             <div className="bg-slate-50 p-4 rounded border border-slate-200 flex justify-between items-center">
-                <span className="text-xs font-bold uppercase text-slate-500">Fluxo (Φ)</span>
-                <span className="text-2xl font-mono font-bold text-blue-600">{flux.toFixed(1)} Wb</span>
-             </div>
-             <div className="bg-slate-50 p-4 rounded border border-slate-200 flex justify-between items-center">
-                <span className="text-xs font-bold uppercase text-slate-500">Fem (ε)</span>
-                <span className={`text-2xl font-mono font-bold transition-colors ${Math.abs(emf) > 1 ? 'text-amber-500' : 'text-slate-400'}`}>
-                  {Math.abs(emf).toFixed(1)} V
-                </span>
-             </div>
-          </div>
-
-          <div className="h-40 bg-slate-900 rounded border border-slate-700 relative overflow-hidden">
-             <div className="absolute top-2 left-2 text-xs text-slate-500 font-mono">Gráfico: Fem vs Tempo</div>
-             <div className="absolute inset-0 flex items-center">
-               <div className="w-full border-t border-slate-700 border-dashed"></div>
-             </div>
-             <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
-               <polyline 
-                 points={polylinePoints}
-                 fill="none"
-                 stroke="#f59e0b"
-                 strokeWidth="2"
-                 vectorEffect="non-scaling-stroke"
-               />
-             </svg>
-          </div>
-        </Card>
-      </div>
-    </div>
-  );
-};
-
 const CoaxialEnergySim = () => {
   const [current, setCurrent] = useState(2);
   const [a, setA] = useState(20); 
@@ -550,10 +917,10 @@ const CoaxialEnergySim = () => {
          </Card>
          
          <FormulaBlock 
-            title="Energia Magnética"
-            description="A energia armazenada no campo magnético entre os condutores depende do quadrado da corrente e da geometria."
-            formula="W = (μ₀I²l / 4π) ln(b/a)"
-            quote="A energia por unidade de volume é B²/2μ₀."
+           title="Energia Magnética"
+           description="A energia armazenada no campo magnético entre os condutores depende do quadrado da corrente e da geometria."
+           formula="W = (μ₀I²l / 4π) ln(b/a)"
+           quote="A energia por unidade de volume é B²/2μ₀."
          />
          
          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
@@ -569,13 +936,13 @@ const CoaxialEnergySim = () => {
        </div>
 
        <Card title="Corte Transversal (Visualização)" icon="eye">
-          <div className="flex justify-center bg-slate-50 rounded-lg border border-slate-200 overflow-hidden h-[300px]">
-             <GraphCanvas drawFn={drawEnergyDensity} width={300} height={300} className="w-full h-full" />
-          </div>
-          <div className="mt-4 text-sm text-slate-500 text-center">
-             A cor <span className="text-blue-500 font-bold">azul</span> representa a densidade de energia magnética (u). 
-             Note como a energia se concentra perto do condutor interno (raio a), onde o campo B é mais forte.
-          </div>
+         <div className="flex justify-center bg-slate-50 rounded-lg border border-slate-200 overflow-hidden h-[300px]">
+            <GraphCanvas drawFn={drawEnergyDensity} width={300} height={300} className="w-full h-full" />
+         </div>
+         <div className="mt-4 text-sm text-slate-500 text-center">
+            A cor <span className="text-blue-500 font-bold">azul</span> representa a densidade de energia magnética (u). 
+            Note como a energia se concentra perto do condutor interno (raio a), onde o campo B é mais forte.
+         </div>
        </Card>
     </div>
   );
@@ -584,7 +951,7 @@ const CoaxialEnergySim = () => {
 const ACGenerator = () => {
   const [active, setActive] = useState(false);
   const [angle, setAngle] = useState(0);
-  const [magnetStrength, setMagnetStrength] = useState(1.0); // Novo estado: Força do Ímã
+  const [magnetStrength, setMagnetStrength] = useState(1.0); 
   const [history, setHistory] = useState(new Array(200).fill(0));
   const reqRef = useRef();
 
@@ -600,7 +967,6 @@ const ACGenerator = () => {
   }, [active]);
 
   useEffect(() => {
-    // Escala o valor histórico pela força do ímã
     const val = Math.sin(angle * Math.PI / 180) * magnetStrength;
     setHistory(prev => {
       const next = [...prev, val];
@@ -638,7 +1004,6 @@ const ACGenerator = () => {
           </div>
 
           <div className="mt-6 flex flex-col gap-4">
-             {/* Controle de rotação */}
              <div className="flex justify-center">
                 <button 
                   onClick={() => setActive(!active)}
@@ -650,7 +1015,6 @@ const ACGenerator = () => {
                 </button>
              </div>
 
-             {/* Novo Controle: Força do Ímã */}
              <div className="bg-slate-50 p-4 rounded border border-slate-200">
                 <label className="flex justify-between text-sm font-bold text-slate-600 mb-2">
                    Força do Ímã (B)
@@ -674,7 +1038,7 @@ const ACGenerator = () => {
                { data: history, color: '#34d399' }
              ]}
              height={200}
-             yRange={3.2} /* Ajustado para acomodar aumento de amplitude */
+             yRange={3.2} 
              timeScale={5}
            />
            
@@ -722,7 +1086,6 @@ const TransformerSim = () => {
     const points = 200;
     const inputWave = [];
     const outputWave = [];
-    
     const ratio = ns / np;
     const vs = vp * ratio;
 
@@ -738,13 +1101,8 @@ const TransformerSim = () => {
   
   let typeLabel = "Isolador";
   let typeIcon = "minus";
-  if (vs > vp) {
-      typeLabel = "Elevador (Step-Up)";
-      typeIcon = "trending-up"; 
-  } else if (vs < vp) {
-      typeLabel = "Rebaixador (Step-Down)";
-      typeIcon = "trending-down";
-  }
+  if (vs > vp) { typeLabel = "Elevador (Step-Up)"; typeIcon = "trending-up"; } 
+  else if (vs < vp) { typeLabel = "Rebaixador (Step-Down)"; typeIcon = "trending-down"; }
 
   return (
     <div className="grid md:grid-cols-12 gap-6">
@@ -946,7 +1304,7 @@ const RLCResonance = () => {
   const XL = omega * (L / 1000);
   const XC = 1 / (omega * (C / 1000000));
   const Z = Math.sqrt(R*R + (XL - XC)**2);
-  const I_max = 120 / Z; // Considerando fonte de 120V
+  const I_max = 120 / Z; 
   
   const f_res = 1 / (2 * Math.PI * Math.sqrt((L/1000) * (C/1000000)));
 
@@ -1014,7 +1372,6 @@ const RLCResonance = () => {
              </div>
            </div>
 
-           {/* Painel de Resultados RLC imitando a imagem solicitada */}
            <div className="bg-[#111827] p-4 rounded-lg mt-6 font-mono text-sm grid grid-cols-2 gap-y-2 border border-slate-700 shadow-inner">
              <div className="flex justify-between pr-2">
                <span className="text-slate-400 font-bold">X_L:</span>
@@ -1050,23 +1407,13 @@ const RLCResonance = () => {
           <Card title="Diagrama de Fasores (Vetores)" icon="maximize-2">
              <div className="h-[300px] flex items-center justify-center bg-slate-900 rounded-lg relative overflow-hidden">
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:20px_20px]"></div>
-                {/* Eixos */}
                 <div className="absolute w-full h-[1px] bg-slate-700"></div>
                 <div className="absolute h-full w-[1px] bg-slate-700"></div>
                 
-                {/* Vetores */}
                 <div className="relative w-full h-full">
-                    {/* Referencia (Corrente - Eixo X) - Não desenhado explicitamente, assumimos fase 0 para I */}
-                    {/* R (Em fase com I) */}
                     <div className="absolute top-1/2 left-1/2 h-1 bg-amber-400 origin-left rounded-full" style={{ width: `${Math.min(R, 140)}px`, transform: 'translateY(-50%)' }}></div>
-                    
-                    {/* XL (90 graus) */}
                     <div className="absolute top-1/2 left-1/2 w-1 bg-blue-500 origin-bottom rounded-full" style={{ height: `${Math.min(XL, 140)}px`, transform: 'translate(-50%, -100%)' }}></div>
-
-                    {/* XC (-90 graus) */}
                     <div className="absolute top-1/2 left-1/2 w-1 bg-red-500 origin-top rounded-full" style={{ height: `${Math.min(XC, 140)}px`, transform: 'translate(-50%, 0)' }}></div>
-
-                    {/* Z Total */}
                     <div className="absolute top-1/2 left-1/2 h-1 bg-green-500 origin-left rounded-full opacity-80" 
                          style={{ 
                            width: `${Math.min(Z, 140)}px`, 
@@ -1112,7 +1459,7 @@ const RailgunSim = () => {
   const bField = 2;
   const mass = 0.05; // 50g projectile
 
-  const maxEnergy = 0.5 * (capacitance/1000) * (voltage * voltage); // 1/2 CV^2
+  const maxEnergy = 0.5 * (capacitance/1000) * (voltage * voltage); 
   
   useEffect(() => {
     let interval;
@@ -1126,25 +1473,16 @@ const RailgunSim = () => {
     if (fired) {
       setKineticEnergy(0);
       let startTime = Date.now();
-      
-      // FIX AQUI: Captura a porcentagem de carga no momento do disparo para escalar a força
       const chargeFactor = charge / 100;
-
-      // A força agora depende da carga efetiva. 
-      // Se carga = 100%, usa força total. Se 50%, usa metade (simulando menor corrente de pico)
       const maxForce = ((voltage * capacitance * bField) / 100) * chargeFactor; 
 
       const anim = setInterval(() => {
         const t = (Date.now() - startTime) / 1000;
-        // A física permanece a mesma, mas maxForce agora é variável com a carga
         const accel = maxForce / mass; 
-
         const newPos = (0.5 * maxForce * t * t) * 500;
         const currentVelocity = (maxForce * t) * 10; 
 
         setProjX(Math.min(newPos, 600));
-        
-        // Atualiza a energia cinética em tempo real
         setKineticEnergy(0.5 * mass * currentVelocity * currentVelocity);
 
         if (newPos > 600) {
@@ -1157,7 +1495,7 @@ const RailgunSim = () => {
       }, 16);
       return () => clearInterval(anim);
     }
-  }, [fired]); // Dependência em fired dispara a lógica. 'charge' é capturado dentro do closure ou via referência, aqui assumimos closure do render que setou fired=true
+  }, [fired]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -1239,14 +1577,15 @@ const RailgunSim = () => {
 };
 
 const App = () => {
-  const [tab, setTab] = useState('lenz');
+  const [tab, setTab] = useState('betatron');
 
   useEffect(() => {
     setTimeout(() => lucide.createIcons(), 50);
   }, [tab]);
 
-  // Atualizado conforme solicitado: Labels correspondem aos nomes dos exemplos, Themes correspondem aos tópicos físicos.
   const tabs = [
+    { id: 'betatron', label: 'O Betatron', icon: 'circle-dot', theme: 'Campo Elétrico Induzido' },
+    { id: 'jumpingRing', label: 'Anel Saltador', icon: 'arrow-up-circle', theme: 'Lei de Lenz e Força' },
     { id: 'lenz', label: 'Lei de Lenz', icon: 'zap', theme: 'Indução Eletromagnética' },
     { id: 'faraday', label: 'Barra Móvel', icon: 'maximize', theme: 'Lei de Faraday' }, 
     { id: 'coaxial', label: 'Cabo Coaxial', icon: 'layers', theme: 'Energia Magnética' }, 
@@ -1287,19 +1626,12 @@ const App = () => {
         </div>
       </header>
 
-      {/* BARRA DE INFORMAÇÕES DINÂMICA (ESTILO SOLICITADO) */}
       <div className="bg-[#1e293b] text-white shadow-md border-b border-slate-700">
          <div className="max-w-6xl mx-auto px-4 py-6 flex flex-col justify-center items-center text-center">
-             
-             {/* Nome do Exemplo (ex: Barra Móvel) */}
              <h2 className="text-3xl font-bold mb-4 tracking-tight text-slate-100">{currentInfo.label}</h2>
-             
-             {/* Barra Visual */}
              <div className="h-1.5 w-64 bg-slate-700 rounded-full mb-3 overflow-hidden">
                 <div className="h-full bg-blue-500 w-1/2 rounded-full mx-auto"></div>
              </div>
-
-             {/* Tema Pertinente (ex: Lei de Faraday) */}
              <h3 className="text-sm font-mono text-blue-400 uppercase tracking-widest font-bold">{currentInfo.theme}</h3>
          </div>
       </div>
@@ -1321,6 +1653,8 @@ const App = () => {
 
       <main className="flex-grow bg-slate-50 p-4 md:p-8">
         <div className="max-w-6xl mx-auto">
+          {tab === 'betatron' && <BetatronSim />}
+          {tab === 'jumpingRing' && <JumpingRingSim />}
           {tab === 'lenz' && <LenzSimulator />}
           {tab === 'faraday' && <FaradayFluxSim />} 
           {tab === 'coaxial' && <CoaxialEnergySim />}
